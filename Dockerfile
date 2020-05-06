@@ -55,10 +55,10 @@ FROM base
 
 ARG LIBJWT=libjwt.so.0.4.0
 
-COPY --from=builder /usr/src/nginx-${NGINX_VERSION}/objs/ngx_http_auth_jwt_module.so /usr/lib/nginx/modules/ngx_http_auth_jwt_module.so
+COPY --from=builder /usr/src/nginx-${NGINX_VERSION}/objs/ngx_http_auth_jwt_fic_module.so /usr/lib/nginx/modules/ngx_http_auth_jwt_fic_module.so
 COPY --from=builder /usr/local/lib/${LIBJWT} /lib
 
 RUN apk add --no-cache jansson \
-  && sed -i '1iload_module modules/ngx_http_auth_jwt_module.so;' /etc/nginx/nginx.conf \
+  && sed -i '1iload_module modules/ngx_http_auth_jwt_fic_module.so;' /etc/nginx/nginx.conf \
   && ln -s /lib/${LIBJWT} /lib/libjwt.so.0 \
   && ln -s /lib/${LIBJWT} /lib/libjwt.so

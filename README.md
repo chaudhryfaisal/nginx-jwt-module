@@ -8,7 +8,7 @@
 
 This is an NGINX module to check for a valid JWT.
 
-Inspired by [TeslaGov](https://github.com/TeslaGov/ngx-http-auth-jwt-module), [ch1bo](https://github.com/ch1bo/nginx-jwt) and [tizpuppi](https://github.com/tizpuppi/ngx_http_auth_jwt_module), this module intend to be as light as possible and to remain simple.
+Inspired by [TeslaGov](https://github.com/TeslaGov/ngx-http-auth-jwt-module), [ch1bo](https://github.com/ch1bo/nginx-jwt) and [tizpuppi](https://github.com/tizpuppi/ngx_http_auth_jwt_fic_module), this module intend to be as light as possible and to remain simple.
  - Docker image based on the [official nginx Dockerfile](https://github.com/nginxinc/docker-nginx) (alpine).
  - Light image (~16MB).
 
@@ -17,42 +17,42 @@ Inspired by [TeslaGov](https://github.com/TeslaGov/ngx-http-auth-jwt-module), [c
 ### Example Configuration:
 ```nginx
 server {
-    auth_jwt_key "0123456789abcdef" hex; # Your key as hex string
-    auth_jwt     off;
+    auth_jwt_fic_key "0123456789abcdef" hex; # Your key as hex string
+    auth_jwt_fic     off;
 
     location /secured-by-cookie/ {
-        auth_jwt $cookie_MyCookieName;
+        auth_jwt_fic $cookie_MyCookieName;
     }
 
     location /secured-by-auth-header/ {
-        auth_jwt on;
+        auth_jwt_fic on;
     }
 
     location /secured-by-auth-header-too/ {
-        auth_jwt_key "another-secret"; # Your key as utf8 string
-        auth_jwt on;
+        auth_jwt_fic_key "another-secret"; # Your key as utf8 string
+        auth_jwt_fic on;
     }
 
     location /secured-by-rsa-key/ {
-        auth_jwt_key /etc/keys/rsa-public.pem file; # Your key from a PEM file
-        auth_jwt on;
+        auth_jwt_fic_key /etc/keys/rsa-public.pem file; # Your key from a PEM file
+        auth_jwt_fic on;
     }
 
     location /not-secure/ {}
 }
 ```
 
-> Note: don't forget to [load](http://nginx.org/en/docs/ngx_core_module.html#load_module) the module in the main context: <br>`load_module /usr/lib/nginx/modules/ngx_http_auth_jwt_module.so;`
+> Note: don't forget to [load](http://nginx.org/en/docs/ngx_core_module.html#load_module) the module in the main context: <br>`load_module /usr/lib/nginx/modules/ngx_http_auth_jwt_fic_module.so;`
 
 ### Directives:
 
-    Syntax:	 auth_jwt $variable | on | off;
-    Default: auth_jwt off;
+    Syntax:	 auth_jwt_fic $variable | on | off;
+    Default: auth_jwt_fic off;
     Context: http, server, location
 
 Enables validation of JWT.<hr>
 
-    Syntax:	 auth_jwt_key value [encoding];
+    Syntax:	 auth_jwt_fic_key value [encoding];
     Default: ——
     Context: http, server, location
 
@@ -62,8 +62,8 @@ The `file` option requires the *value* to be a valid file path (pointing to a PE
 
 <hr>
 
-    Syntax:	 auth_jwt_alg any | HS256 | HS384 | HS512 | RS256 | RS384 | RS512 | ES256 | ES384 | ES512;
-    Default: auth_jwt_alg any;
+    Syntax:	 auth_jwt_fic_alg any | HS256 | HS384 | HS512 | RS256 | RS384 | RS512 | ES256 | ES384 | ES512;
+    Default: auth_jwt_fic_alg any;
     Context: http, server, location
 
 Specifies which algorithm the server expects to receive in the JWT.

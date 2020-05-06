@@ -68,7 +68,7 @@ VALID_JWT="eyJhbGciOiJIUzI1NiJ9.e30.-gVyhFDs5NeX0yvaAoTPVgrDfrg_qk7dF0sNj_-Bu-c"
 BAD_SIG="eyJhbGciOiJIUzI1NiJ9.e30.nmwH1lIcnA-g8CEV_fWIlAV7h98_Wwy1gIqIabAdrIs"
 
 test_for_tab () {
-  local test=`grep $'\t' src/ngx_http_auth_jwt_module.c | wc -l`
+  local test=`grep $'\t' src/ngx_http_auth_jwt_fic_module.c | wc -l`
   local name='Indent test'
   if [ "$test" == "0" ];then
     echo -e "${GREEN}${name}: passed${NONE}";
@@ -163,11 +163,11 @@ if [[ "$DOCKER_CONTAINER_NAME" == "0" ]]; then
   exit 1
 fi
 
-test_conf 'invalid-nginx' '"auth_jwt_key" directive is duplicate in /etc/nginx/invalid-nginx.conf:18'
+test_conf 'invalid-nginx' '"auth_jwt_fic_key" directive is duplicate in /etc/nginx/invalid-nginx.conf:18'
 
-test_conf 'invalid-arg-1' 'invalid number of arguments in "auth_jwt" directive in /etc/nginx/invalid-arg-1.conf:6'
+test_conf 'invalid-arg-1' 'invalid number of arguments in "auth_jwt_fic" directive in /etc/nginx/invalid-arg-1.conf:6'
 
-test_conf 'invalid-arg-2' 'invalid number of arguments in "auth_jwt_key" directive in /etc/nginx/invalid-arg-2.conf:5'
+test_conf 'invalid-arg-2' 'invalid number of arguments in "auth_jwt_fic_key" directive in /etc/nginx/invalid-arg-2.conf:5'
 
 test_conf 'invalid-arg-3' 'Invalid key in /etc/nginx/invalid-arg-3.conf:5'
 

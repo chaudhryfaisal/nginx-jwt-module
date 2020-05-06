@@ -6,19 +6,19 @@
 #include <jansson.h>
 
 typedef struct {
-  ngx_str_t jwt_key;          // Forwarded key (with auth_jwt_key)
-  ngx_int_t jwt_flag;         // Function of "auth_jwt": on -> 1 | off -> 0 | $variable -> 2
+  ngx_str_t jwt_key;          // Forwarded key (with auth_jwt_fic_key)
+  ngx_int_t jwt_flag;         // Function of "auth_jwt_fic": on -> 1 | off -> 0 | $variable -> 2
   ngx_int_t jwt_var_index;    // Used only if jwt_flag==2 to fetch the $variable value
   ngx_uint_t jwt_algorithm;
-} ngx_http_auth_jwt_loc_conf_t;
+} ngx_http_auth_jwt_fic_loc_conf_t;
 
-#define NGX_HTTP_AUTH_JWT_OFF        0
-#define NGX_HTTP_AUTH_JWT_BEARER     1
-#define NGX_HTTP_AUTH_JWT_VARIABLE   2
+#define NGX_HTTP_auth_jwt_fic_OFF        0
+#define NGX_HTTP_auth_jwt_fic_BEARER     1
+#define NGX_HTTP_auth_jwt_fic_VARIABLE   2
 
-#define NGX_HTTP_AUTH_JWT_ENCODING_HEX     0
-#define NGX_HTTP_AUTH_JWT_ENCODING_BASE64  1
-#define NGX_HTTP_AUTH_JWT_ENCODING_UTF8    2
+#define NGX_HTTP_auth_jwt_fic_ENCODING_HEX     0
+#define NGX_HTTP_auth_jwt_fic_ENCODING_BASE64  1
+#define NGX_HTTP_auth_jwt_fic_ENCODING_UTF8    2
 
 #define JWT_ALG_ANY JWT_ALG_NONE
 
@@ -26,7 +26,7 @@ typedef struct {
  * Enum of accepted jwt algorithms, mapped on the libjwt one.
  * Note that the "any" string is mapped on the JWT_ALG_ANY=JWT_ALG_NONE value to avoid conflict with other ones.
  */
-static ngx_conf_enum_t ngx_http_auth_jwt_algorithms[] = {
+static ngx_conf_enum_t ngx_http_auth_jwt_fic_algorithms[] = {
   { ngx_string("HS256"), JWT_ALG_HS256 },
   { ngx_string("HS384"), JWT_ALG_HS384 },
   { ngx_string("HS512"), JWT_ALG_HS512 },
@@ -39,53 +39,53 @@ static ngx_conf_enum_t ngx_http_auth_jwt_algorithms[] = {
   { ngx_string("any"), JWT_ALG_ANY }
 };
 
-static ngx_int_t ngx_http_auth_jwt_handler(ngx_http_request_t *r);
-static ngx_int_t auth_jwt_get_token(u_char **token, ngx_http_request_t *r, const ngx_http_auth_jwt_loc_conf_t *conf);
-static char * auth_jwt_key_from_file(ngx_conf_t *cf, const char *path, ngx_str_t *key);
-static u_char * auth_jwt_safe_string(ngx_pool_t *pool, u_char *src, size_t len);
+static ngx_int_t ngx_http_auth_jwt_fic_handler(ngx_http_request_t *r);
+static ngx_int_t auth_jwt_fic_get_token(u_char **token, ngx_http_request_t *r, const ngx_http_auth_jwt_fic_loc_conf_t *conf);
+static char * auth_jwt_fic_key_from_file(ngx_conf_t *cf, const char *path, ngx_str_t *key);
+static u_char * auth_jwt_fic_safe_string(ngx_pool_t *pool, u_char *src, size_t len);
 
 // Configuration functions
-static ngx_int_t ngx_http_auth_jwt_init(ngx_conf_t *cf);
-static void * ngx_http_auth_jwt_create_conf(ngx_conf_t *cf);
-static char * ngx_http_auth_jwt_merge_conf(ngx_conf_t *cf, void *parent, void *child);
+static ngx_int_t ngx_http_auth_jwt_fic_init(ngx_conf_t *cf);
+static void * ngx_http_auth_jwt_fic_create_conf(ngx_conf_t *cf);
+static char * ngx_http_auth_jwt_fic_merge_conf(ngx_conf_t *cf, void *parent, void *child);
 
 // Declaration functions
-static char * ngx_conf_set_auth_jwt_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
-static char * ngx_conf_set_auth_jwt(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char * ngx_conf_set_auth_jwt_fic_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char * ngx_conf_set_auth_jwt_fic(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
-static ngx_command_t ngx_http_auth_jwt_commands[] = {
+static ngx_command_t ngx_http_auth_jwt_fic_commands[] = {
 
-  // auth_jwt_key value [hex | base64 | utf8 | file];
-  { ngx_string("auth_jwt_key"),
+  // auth_jwt_fic_key value [hex | base64 | utf8 | file];
+  { ngx_string("auth_jwt_fic_key"),
     NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
-    ngx_conf_set_auth_jwt_key,
+    ngx_conf_set_auth_jwt_fic_key,
     NGX_HTTP_LOC_CONF_OFFSET,
-    offsetof(ngx_http_auth_jwt_loc_conf_t, jwt_key),
+    offsetof(ngx_http_auth_jwt_fic_loc_conf_t, jwt_key),
     NULL },
 
-  // auth_jwt $variable | off | on;
-  { ngx_string("auth_jwt"),
+  // auth_jwt_fic $variable | off | on;
+  { ngx_string("auth_jwt_fic"),
     NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
-    ngx_conf_set_auth_jwt,
+    ngx_conf_set_auth_jwt_fic,
     NGX_HTTP_LOC_CONF_OFFSET,
-    offsetof(ngx_http_auth_jwt_loc_conf_t, jwt_flag),
+    offsetof(ngx_http_auth_jwt_fic_loc_conf_t, jwt_flag),
     NULL },
 
-  // auth_jwt_alg HS256 | HS384 | HS512 | RS256 | RS384 | RS512 | ES256 | ES384 | ES512;
-  { ngx_string("auth_jwt_alg"),
+  // auth_jwt_fic_alg HS256 | HS384 | HS512 | RS256 | RS384 | RS512 | ES256 | ES384 | ES512;
+  { ngx_string("auth_jwt_fic_alg"),
     NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
     ngx_conf_set_enum_slot,
     NGX_HTTP_LOC_CONF_OFFSET,
-    offsetof(ngx_http_auth_jwt_loc_conf_t, jwt_algorithm),
-    &ngx_http_auth_jwt_algorithms },
+    offsetof(ngx_http_auth_jwt_fic_loc_conf_t, jwt_algorithm),
+    &ngx_http_auth_jwt_fic_algorithms },
 
   ngx_null_command
 };
 
 
-static ngx_http_module_t ngx_http_auth_jwt_module_ctx = {
+static ngx_http_module_t ngx_http_auth_jwt_fic_module_ctx = {
   NULL,                        /* preconfiguration */
-  ngx_http_auth_jwt_init,      /* postconfiguration */
+  ngx_http_auth_jwt_fic_init,      /* postconfiguration */
 
   NULL,                        /* create main configuration */
   NULL,                        /* init main configuration */
@@ -93,15 +93,15 @@ static ngx_http_module_t ngx_http_auth_jwt_module_ctx = {
   NULL,                        /* create server configuration */
   NULL,                        /* merge server configuration */
 
-  ngx_http_auth_jwt_create_conf,             /* create location configuration */
-  ngx_http_auth_jwt_merge_conf               /* merge location configuration */
+  ngx_http_auth_jwt_fic_create_conf,             /* create location configuration */
+  ngx_http_auth_jwt_fic_merge_conf               /* merge location configuration */
 };
 
 
-ngx_module_t ngx_http_auth_jwt_module = {
+ngx_module_t ngx_http_auth_jwt_fic_module = {
   NGX_MODULE_V1,
-  &ngx_http_auth_jwt_module_ctx,     /* module context */
-  ngx_http_auth_jwt_commands,        /* module directives */
+  &ngx_http_auth_jwt_fic_module_ctx,     /* module context */
+  ngx_http_auth_jwt_fic_commands,        /* module directives */
   NGX_HTTP_MODULE,                   /* module type */
   NULL,                              /* init master */
   NULL,                              /* init module */
@@ -114,16 +114,16 @@ ngx_module_t ngx_http_auth_jwt_module = {
 };
 
 
-static ngx_int_t ngx_http_auth_jwt_handler(ngx_http_request_t *r)
+static ngx_int_t ngx_http_auth_jwt_fic_handler(ngx_http_request_t *r)
 {
-  const ngx_http_auth_jwt_loc_conf_t *conf;
+  const ngx_http_auth_jwt_fic_loc_conf_t *conf;
   u_char *jwt_data;
   jwt_t *jwt = NULL;
 
-  conf = ngx_http_get_module_loc_conf(r, ngx_http_auth_jwt_module);
+  conf = ngx_http_get_module_loc_conf(r, ngx_http_auth_jwt_fic_module);
 
-  // Pass through if "auth_jwt" is "off"
-  if (conf->jwt_flag == NGX_HTTP_AUTH_JWT_OFF)
+  // Pass through if "auth_jwt_fic" is "off"
+  if (conf->jwt_flag == NGX_HTTP_auth_jwt_fic_OFF)
   {
     return NGX_DECLINED;
   }
@@ -135,7 +135,7 @@ static ngx_int_t ngx_http_auth_jwt_handler(ngx_http_request_t *r)
   }
 
   // Get jwt
-  if (auth_jwt_get_token(&jwt_data, r, conf) != NGX_OK)
+  if (auth_jwt_fic_get_token(&jwt_data, r, conf) != NGX_OK)
   {
     ngx_log_error(NGX_LOG_WARN, r->connection->log, 0, "JWT: failed to find a jwt");
     return NGX_HTTP_UNAUTHORIZED;
@@ -160,7 +160,7 @@ static ngx_int_t ngx_http_auth_jwt_handler(ngx_http_request_t *r)
 
   // Validate the algorithm
   jwt_alg_t alg = jwt_get_alg(jwt);
-  // Reject incoming token with a "none" algorithm, or, if auth_jwt_alg is set, those with a different one.
+  // Reject incoming token with a "none" algorithm, or, if auth_jwt_fic_alg is set, those with a different one.
   if (alg == JWT_ALG_NONE || (conf->jwt_algorithm != JWT_ALG_ANY && conf->jwt_algorithm != alg))
   {
     ngx_log_error(NGX_LOG_WARN, r->connection->log, 0, "JWT: invalid algorithm in jwt %d", jwt_get_alg(jwt));
@@ -179,7 +179,7 @@ static ngx_int_t ngx_http_auth_jwt_handler(ngx_http_request_t *r)
 }
 
 
-static ngx_int_t ngx_http_auth_jwt_init(ngx_conf_t *cf)
+static ngx_int_t ngx_http_auth_jwt_fic_init(ngx_conf_t *cf)
 {
   ngx_http_handler_pt        *h;
   ngx_http_core_main_conf_t  *cmcf;
@@ -192,17 +192,17 @@ static ngx_int_t ngx_http_auth_jwt_init(ngx_conf_t *cf)
     return NGX_ERROR;
   }
 
-  *h = ngx_http_auth_jwt_handler;
+  *h = ngx_http_auth_jwt_fic_handler;
 
   return NGX_OK;
 }
 
 
-static void * ngx_http_auth_jwt_create_conf(ngx_conf_t *cf)
+static void * ngx_http_auth_jwt_fic_create_conf(ngx_conf_t *cf)
 {
-  ngx_http_auth_jwt_loc_conf_t *conf;
+  ngx_http_auth_jwt_fic_loc_conf_t *conf;
 
-  conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_auth_jwt_loc_conf_t));
+  conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_auth_jwt_fic_loc_conf_t));
   if (conf == NULL)
   {
     ngx_conf_log_error(NGX_LOG_ERR, cf, 0, "JWT: conf==NULL");
@@ -219,14 +219,14 @@ static void * ngx_http_auth_jwt_create_conf(ngx_conf_t *cf)
 }
 
 
-static char * ngx_http_auth_jwt_merge_conf(ngx_conf_t *cf, void *parent, void *child)
+static char * ngx_http_auth_jwt_fic_merge_conf(ngx_conf_t *cf, void *parent, void *child)
 {
-  ngx_http_auth_jwt_loc_conf_t *prev = parent;
-  ngx_http_auth_jwt_loc_conf_t *conf = child;
+  ngx_http_auth_jwt_fic_loc_conf_t *prev = parent;
+  ngx_http_auth_jwt_fic_loc_conf_t *conf = child;
 
   ngx_conf_merge_str_value(conf->jwt_key, prev->jwt_key, "");
   ngx_conf_merge_value(conf->jwt_var_index, prev->jwt_var_index, NGX_CONF_UNSET);
-  ngx_conf_merge_value(conf->jwt_flag, prev->jwt_flag, NGX_HTTP_AUTH_JWT_OFF);
+  ngx_conf_merge_value(conf->jwt_flag, prev->jwt_flag, NGX_HTTP_auth_jwt_fic_OFF);
   ngx_conf_merge_uint_value(conf->jwt_algorithm, prev->jwt_algorithm, JWT_ALG_ANY);
 
   return NGX_CONF_OK;
@@ -250,7 +250,7 @@ static int hex_to_binary(u_char* dest, u_char* src, const size_t n)
 
 
 // Assign key from file
-static char * auth_jwt_key_from_file(ngx_conf_t *cf, const char *path, ngx_str_t *key)
+static char * auth_jwt_fic_key_from_file(ngx_conf_t *cf, const char *path, ngx_str_t *key)
 {
   // Determine file size (avoiding fseek)
   struct stat fstat;
@@ -283,8 +283,8 @@ static char * auth_jwt_key_from_file(ngx_conf_t *cf, const char *path, ngx_str_t
 }
 
 
-// Parse auth_jwt_key directive
-static char * ngx_conf_set_auth_jwt_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+// Parse auth_jwt_fic_key directive
+static char * ngx_conf_set_auth_jwt_fic_key(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
   ngx_str_t *key = conf;
   ngx_str_t *value;
@@ -301,22 +301,22 @@ static char * ngx_conf_set_auth_jwt_key(ngx_conf_t *cf, ngx_command_t *cmd, void
   // If there is only the key string;
   if (cf->args->nelts == 2)
   {
-    encoding = NGX_HTTP_AUTH_JWT_ENCODING_UTF8;
+    encoding = NGX_HTTP_auth_jwt_fic_ENCODING_UTF8;
   }
-  // We can have (auth_jwt_key value [encoding | file])
+  // We can have (auth_jwt_fic_key value [encoding | file])
   else if (cf->args->nelts == 3)
   {
     if (ngx_strcmp(value[2].data, "file") == 0)
     {
-      const char *path = (char *)auth_jwt_safe_string(cf->pool, value[1].data, value[1].len);
-      return auth_jwt_key_from_file(cf, path, key);
+      const char *path = (char *)auth_jwt_fic_safe_string(cf->pool, value[1].data, value[1].len);
+      return auth_jwt_fic_key_from_file(cf, path, key);
     }
     else if (ngx_strcmp(value[2].data, "hex") == 0)
-      encoding = NGX_HTTP_AUTH_JWT_ENCODING_HEX;
+      encoding = NGX_HTTP_auth_jwt_fic_ENCODING_HEX;
     else if (ngx_strcmp(value[2].data, "base64") == 0)
-      encoding = NGX_HTTP_AUTH_JWT_ENCODING_BASE64;
+      encoding = NGX_HTTP_auth_jwt_fic_ENCODING_BASE64;
     else if (ngx_strcmp(value[2].data, "utf8") == 0)
-      encoding = NGX_HTTP_AUTH_JWT_ENCODING_UTF8;
+      encoding = NGX_HTTP_auth_jwt_fic_ENCODING_UTF8;
     else
       return NGX_CONF_ERROR;
   }
@@ -335,7 +335,7 @@ static char * ngx_conf_set_auth_jwt_key(ngx_conf_t *cf, ngx_command_t *cmd, void
 
   switch (encoding)
   {
-    case NGX_HTTP_AUTH_JWT_ENCODING_HEX:
+    case NGX_HTTP_auth_jwt_fic_ENCODING_HEX:
       // Parse provided key
       if (keystr->len % 2)
       {
@@ -350,7 +350,7 @@ static char * ngx_conf_set_auth_jwt_key(ngx_conf_t *cf, ngx_command_t *cmd, void
         return NGX_CONF_ERROR;
       }
       return NGX_CONF_OK;
-    case NGX_HTTP_AUTH_JWT_ENCODING_BASE64:
+    case NGX_HTTP_auth_jwt_fic_ENCODING_BASE64:
       key->len = ngx_base64_decoded_length(keystr->len);
       key->data = ngx_palloc(cf->pool, key->len);
 
@@ -360,7 +360,7 @@ static char * ngx_conf_set_auth_jwt_key(ngx_conf_t *cf, ngx_command_t *cmd, void
         return NGX_CONF_ERROR;
       }
       return NGX_CONF_OK;
-    case NGX_HTTP_AUTH_JWT_ENCODING_UTF8:
+    case NGX_HTTP_auth_jwt_fic_ENCODING_UTF8:
       key->data = keystr->data;
       key->len = keystr->len;
       return NGX_CONF_OK;
@@ -372,10 +372,10 @@ static char * ngx_conf_set_auth_jwt_key(ngx_conf_t *cf, ngx_command_t *cmd, void
 }
 
 
-// Parse auth_jwt directive
-static char * ngx_conf_set_auth_jwt(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+// Parse auth_jwt_fic directive
+static char * ngx_conf_set_auth_jwt_fic(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-  ngx_http_auth_jwt_loc_conf_t *ajcf = conf;
+  ngx_http_auth_jwt_fic_loc_conf_t *ajcf = conf;
 
   ngx_int_t *flag = &ajcf->jwt_flag;
   ngx_int_t *index = &ajcf->jwt_var_index;
@@ -398,17 +398,17 @@ static char * ngx_conf_set_auth_jwt(ngx_conf_t *cf, ngx_command_t *cmd, void *co
   // Check if enabled, if not: return conf.
   if (var.len == 3 && ngx_strncmp(var.data, "off", 3) == 0)
   {
-    *flag = NGX_HTTP_AUTH_JWT_OFF;
+    *flag = NGX_HTTP_auth_jwt_fic_OFF;
   }
   // If enabled and "on" we will get token from "Authorization" header.
   else if (var.len == 2 && ngx_strncmp(var.data, "on", 2) == 0)
   {
-    *flag = NGX_HTTP_AUTH_JWT_BEARER;
+    *flag = NGX_HTTP_auth_jwt_fic_BEARER;
   }
   // Else we will get token from passed variable.
   else
   {
-    *flag = NGX_HTTP_AUTH_JWT_VARIABLE;
+    *flag = NGX_HTTP_auth_jwt_fic_VARIABLE;
 
     if (var.data[0] != '$')
     {
@@ -431,7 +431,7 @@ static char * ngx_conf_set_auth_jwt(ngx_conf_t *cf, ngx_command_t *cmd, void *co
 
 
 // Copy a character array into a null terminated one.
-static u_char * auth_jwt_safe_string(ngx_pool_t *pool, u_char *src, size_t len)
+static u_char * auth_jwt_fic_safe_string(ngx_pool_t *pool, u_char *src, size_t len)
 {
   u_char  *dst;
 
@@ -449,12 +449,12 @@ static u_char * auth_jwt_safe_string(ngx_pool_t *pool, u_char *src, size_t len)
 }
 
 
-static ngx_int_t auth_jwt_get_token(u_char **token, ngx_http_request_t *r, const ngx_http_auth_jwt_loc_conf_t *conf)
+static ngx_int_t auth_jwt_fic_get_token(u_char **token, ngx_http_request_t *r, const ngx_http_auth_jwt_fic_loc_conf_t *conf)
 {
   static const ngx_str_t bearer = ngx_string("Bearer ");
   const ngx_int_t flag = conf->jwt_flag;
 
-  if (flag == NGX_HTTP_AUTH_JWT_BEARER)
+  if (flag == NGX_HTTP_auth_jwt_fic_BEARER)
   {
     if (r->headers_in.authorization == NULL)
     {
@@ -476,9 +476,9 @@ static ngx_int_t auth_jwt_get_token(u_char **token, ngx_http_request_t *r, const
       return NGX_DECLINED;
     }
 
-    *token = auth_jwt_safe_string(r->pool, header.data + bearer.len, (size_t) header.len - bearer.len);
+    *token = auth_jwt_fic_safe_string(r->pool, header.data + bearer.len, (size_t) header.len - bearer.len);
   }
-  else if (flag == NGX_HTTP_AUTH_JWT_VARIABLE)
+  else if (flag == NGX_HTTP_auth_jwt_fic_VARIABLE)
   {
     ngx_http_variable_value_t * value = ngx_http_get_indexed_variable(r, conf->jwt_var_index);
 
@@ -488,7 +488,7 @@ static ngx_int_t auth_jwt_get_token(u_char **token, ngx_http_request_t *r, const
       return NGX_DECLINED;
     }
 
-    *token = auth_jwt_safe_string(r->pool, value->data, value->len);
+    *token = auth_jwt_fic_safe_string(r->pool, value->data, value->len);
   }
   else
   {
